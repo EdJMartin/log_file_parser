@@ -1,11 +1,13 @@
 import sqlite3
 from collections import namedtuple
-
-ips = ['64.233','66.102','66.249','72.14','74.125','209.85','216.239','66.184']
+import glob
 
 first_parse_list = []
 secondary_parse_list = []
 lines_to_execute = []
+list_of_months = ['Jan','Feb','Apr','Mar','May','Jun','Jul','Aug','Oct','Nov','Dec']
+
+ips = ['64.233','66.102','66.249','72.14','74.125','209.85','216.239','66.184']
 
 def create_database():
     try:
@@ -28,12 +30,12 @@ def open_db_connect():
     conn = sqlite3.connect('Logs.db')
     return conn
 
-def primary_parse():
-    with open('log.com-Oct-2016','r') as file:
+def primary_parse(filename):
+    with open(filename,'r') as file:
         for line in file:
             split_line = line.split(' ')
             userAgent = ''.join(split_line[11:])
-            if 'Google' in userAgent:
+            if 'Googlebot' in userAgent:
                 first_parse_list.append(line)
 
 def secondary_parse():
@@ -54,6 +56,17 @@ def split_line_database():
         split_line = line.split(' ')
         ipAddress = split_line[0]
         date = split_line[3].replace('[', '')
+        date = date.replace('/','')
+        time_date = date.split(':')
+        date = time_date[0]
+        for month in list_of_months:
+            month_index = list_of_months.index(month)
+            month_index += 1
+            if month_index < 10:
+                month_index = '{}{}'.format('0',month_index)
+            else:
+                month_index = str(month_index)
+            date = date.replace(month,month_index)
         url = split_line[6]
         status = split_line[8]
         Numbytes = split_line[9]
@@ -61,12 +74,17 @@ def split_line_database():
         final_line = data_line(ipAddress,date,url,status,Numbytes,UserAgent)
         lines_to_execute.append(final_line)
 
-create_database()
-primary_parse()
-secondary_parse()
-database = open_db_connect()
-split_line_database()
-database.executemany('''INSERT INTO GOOGLELOGS(ID,IP,DATE,URL,STATUS,NUMBYTES,USERAGENT)
-                                VALUES(NULL, ?,?,?,?,?,?)''', (lines_to_execute))
-database.commit()
-database.close()
+
+def main():
+    for file in glob.glob('*.proxy004'):
+        create_database()
+        primary_parse(file)
+        secondary_parse()
+        database = open_db_connect()
+        split_line_database()
+        database.executemany('''INSERT INTO GOOGLELOGS(ID,IP,DATE,URL,STATUS,NUMBYTES,USERAGENT)
+                                        VALUES(NULL, ?,?,?,?,?,?)''', (lines_to_execute))
+        database.commit()
+        database.close()
+
+main()
